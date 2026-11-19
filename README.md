@@ -1,8 +1,8 @@
 # Juno PM
 
-> _(one-line pitch: what Juno does, for whom, in one sentence)_
+> Juno helps internal product managers catch material commitment and readiness drift across scattered product signals before it becomes a stakeholder surprise.
 
-_Your name · cohort · date_
+Luqing Lu · AI Product Management (Duration: Nov13_26 - Nov19_26 | Instructor:Nnanna Enyi) · 11/19/2026
 
 This repo is my final project for the **AI Product Management Certification**. Each module's artifact lives in its own folder.
 
