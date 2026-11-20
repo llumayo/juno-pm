@@ -1,5 +1,4 @@
-# Juno · Decision Sync Agent
-
+# Juno PM
 > **Juno helps product managers keep product artifacts synchronized with approved decisions by finding affected content, drafting the minimum necessary edits, and applying only the changes the PM explicitly approves.**
 
 _Luqing Lu · AI Product Management Certification · November 2026_
