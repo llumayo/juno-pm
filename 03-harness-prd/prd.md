@@ -1,198 +1,167 @@
 # AI PRD · Juno
 
-> Module 3 · Harness / AI PRD. The AI product requirements doc specifying all six harness surfaces, built with the **M3 · AI PRD Builder** (archetype and starting settings from the **M3 · Harness Architecture Decider**). Paste the tool's markdown over this file.
+> Module 3 · Harness / AI PRD. The AI product requirements doc specifying all six harness surfaces for Juno's Decision Sync workflow.
 
 ## Problem & user
 
-Juno helps a product manager prepare 15–20 minutes before an internal stakeholder meeting. Today, the PM manually checks SharePoint, Azure DevOps (ADO), and Microsoft Teams, reconciles conflicting signals, and decides what is relevant to the stakeholder they are about to meet.
+Juno helps a Beacon Product Manager keep product artifacts synchronized after an approved product decision changes.
 
-Juno produces a private, stakeholder-aware brief organized into:
+Today, the PM must remember where a decision appears, search across artifacts, identify stale references, draft updates, and make each change manually.
 
-- **Watch** — risks, unresolved questions, or expectation gaps
-- **Highlight** — recent accomplishments worth sharing
-- **Coming Next** — upcoming work relevant to that stakeholder, with commitment status preserved
+Juno takes an approved decision, identifies the artifacts it affects, drafts the minimum necessary changes, lets the PM review the exact edits, then applies and verifies only the changes the PM approves.
 
-V1 supports three stakeholder lenses:
-
-- **Clinical Proponent:** implementation readiness, intended users, workflow fit, clinical evidence, adoption readiness
-- **IT Leadership:** security, API/integration readiness, technical dependencies, maintainability, scalability
-- **Governance:** intended use, access, required reviews, evaluation, monitoring, drift, ownership
-
-**Archetype:** **Tool-using copilot.** A PM is waiting for the result, the task requires live source retrieval and short reconciliation, and human judgment is still required to decide what is truly important. Juno may read and draft automatically, but it does not mutate source systems or communicate on the PM's behalf.
+**Archetype:** **Tool-using copilot.** A PM is actively reviewing the work. Juno may read, analyze, and draft automatically, but any change to a shared artifact requires explicit PM confirmation.
 
 ---
 
 ## The harness
 
-| **Surface**     | **Specification** |
-| --------------- | ----------------- |
-| 01 Context      | Retrieve current Beacon roadmap, release-readiness, product-decision, ADO, Teams, governance, support, and UX evidence relevant to the selected stakeholder. Dynamic delivery signals must be fresh; stale or unavailable evidence is labeled. |
-| 02 Tools        | Read/search SharePoint, ADO, and Teams; retrieve source metadata; compare evidence; rank for stakeholder relevance; draft the private meeting brief. No write/send/approval tools in V1. |
-| 03 Loop         | Maximum 5 tool turns, one targeted retry, and stop after two consecutive failures from the same source. Escalate unresolved or unverifiable items to the PM. |
-| 04 Memory       | Session state lasts 30 minutes. PM preferences may persist 90 days. Dynamic product facts never persist as trusted memory and are re-fetched each run. |
-| 05 Permissions  | read **auto** · draft **auto** · write **blocked V1** · send **blocked V1** |
-| 06 Verification | Run the **Juno Brief Gate** before display: citations, status accuracy, freshness, conflict handling, stakeholder relevance, and sensitive-conclusion checks. Failed checks become visible uncertainty. |
+| **Surface** | **Specification** |
+|---|---|
+| 01 Context | Retrieve the approved decision, Beacon source-of-truth rules, artifact registry, and current versions of relevant product artifacts. Re-fetch dynamic product truth rather than trusting memory. |
+| 02 Tools | Read decisions and artifacts, search the product corpus, classify impact, draft exact edits, write approved changes, and verify the result. No send, delete, permission-change, or decision-approval tools. |
+| 03 Loop | Maximum 5 tool turns per sync run with one targeted retry. Stop on ambiguity, stale content, failed writes, or failed verification. |
+| 04 Memory | Keep the active review state and PM approvals during the sync session. Product facts and artifact contents are always re-fetched. |
+| 05 Permissions | read **auto** · draft **auto** · write **confirm** · send **blocked** |
+| 06 Verification | Run the **Juno Sync Gate** before a proposed edit and again before and after every approved write. |
 
 ## 01 Context · Data Requirements
 
+Juno operates against the fictional Beacon product corpus in:
+
+`00-context/beacon-product-context.md`
+
 - **Required sources:**
-  - SharePoint: **Beacon Quarterly Roadmap**
-  - SharePoint: **November Workspace Release Readiness**, especially *Access and Migration*
-  - SharePoint / meeting record: **Clinical AI Governance Working Session**
-  - SharePoint / decision record: **Current Product Decisions**
-  - ADO: current work items including **BEC-1842 · Preference Migration** and **BEC-1975 · Model Integration Framework Pilot**
-  - Teams: **Specialty Alpha Partner Team**, **AI Platform Leadership**, **Specialty Beta Clinical Leader**, and **Product Leadership**
-  - current **Support Feedback** and **UX Review Notes**
+  - Beacon Product Decision Registry
+  - Beacon Artifact Registry & Source-of-Truth Map
+  - current Beacon product requirements
+  - current configuration records
+  - current UX specifications
+  - current onboarding and release materials
+  - active product presentations
+  - relevant ADO records when delivery status matters
+  - historical artifacts when needed to determine whether content should be preserved
+
+- **Source authority:**
+  - Product Decision Registry → decision status and scope
+  - approved requirements → product behavior
+  - configuration records → configurable/default properties
+  - ADO / release-readiness → delivery status
+  - current derived artifacts → inherit approved product truth
+
+- **Freshness:**
+  - re-read the triggering decision at the start of every sync run;
+  - fetch current artifact contents before drafting a change;
+  - re-read an artifact immediately before writing to confirm it has not changed since PM review.
 
 - **Deliberate exclusions:**
-  - patient charts, PHI, and patient-specific model outputs — not needed for PM meeting preparation;
-  - unrelated Teams conversations and unrelated project material — excluded to reduce noise and cross-team leakage;
-  - superseded roadmap or decision records — excluded because stale context is worse than no context.
+  - patient-level data or PHI;
+  - unrelated product artifacts;
+  - sources outside the PM's existing access;
+  - content unrelated to the approved decision.
 
-- **SLA of truth:**
-  - ADO and Teams: fetch each run; cached content may be no older than **15 minutes**;
-  - SharePoint roadmap, release-readiness, governance, and decision records: use the **latest current version**;
-  - Support / UX notes: use the latest available version and label evidence older than **7 days**;
-  - default Teams lookback: **14 days**.
-
-- **When a source is unreachable:**
-  - retry once if the source is material;
-  - if a recent cached copy is available within its freshness window, use it and label the retrieval time;
-  - otherwise return a partial brief and mark affected items **NEEDS CLARIFICATION**;
-  - never silently present stale evidence as current.
+If a required source is unavailable or materially conflicts with an authoritative source, return **NEEDS CLARIFICATION** rather than guessing.
 
 ## 02 Tools · System Capabilities
 
-- **The verb list:**
-
 | Verb | Side-effect class | Purpose |
 |---|---|---|
-| `search_sharepoint` | read | Find relevant roadmap, release, governance, and decision material |
-| `read_sharepoint_document` | read | Read a specific SharePoint document or section |
-| `search_ado` | read | Find relevant ADO work items |
-| `read_ado_work_item` | read | Read status, comments, dependencies, scope, and timestamps |
-| `search_teams` | read | Find relevant stakeholder signals in approved Teams scopes |
-| `read_teams_thread` | read | Read the source conversation and timestamp |
-| `get_source_metadata` | read | Return source title, timestamp, version, and link |
-| `compare_evidence` | draft | Detect conflicting dates, status, scope, or commitment language |
-| `rank_for_stakeholder` | draft | Rank evidence for the selected stakeholder lens |
-| `draft_meeting_brief` | draft | Create the private Watch / Highlight / Coming Next brief |
+| `read_decision` | read | Retrieve decision status, scope, rationale, and exclusions |
+| `search_artifacts` | read | Find artifacts potentially affected by the decision |
+| `read_artifact` | read | Retrieve current artifact content |
+| `get_artifact_metadata` | read | Retrieve version, owner, timestamp, and current/historical status |
+| `compare_decision_to_artifact` | draft | Determine whether an artifact conflicts with the approved decision |
+| `classify_artifact_impact` | draft | Classify as Update, Review, No Change, or Historical — Preserve |
+| `draft_artifact_patch` | draft | Produce the minimum proposed edit |
+| `write_artifact` | write | Apply an exact PM-approved edit |
+| `verify_artifact_write` | read | Re-read the artifact and confirm the approved change |
 
 - **Deliberate omissions:**
-  - no `update_ado_work_item` — Juno's V1 job is preparation, not changing shared delivery state;
-  - no `edit_sharepoint` — an incorrect edit could corrupt an authoritative source;
-  - no `post_teams_message` or `send_email` — Juno must not communicate on the PM's behalf;
-  - no `change_permissions` — outside Juno's role and high blast radius;
-  - no governance, security, or clinical approval tool — approval remains an accountable human decision;
-  - no roadmap-write tool — roadmap commitments require human product judgment and alignment.
+  - no product-decision approval tool;
+  - no delete tool;
+  - no permission-change tool;
+  - no Teams post or email-send tool;
+  - no ADO delivery-state update;
+  - no automatic modification of historical artifacts.
 
 ## 03 Loop · AI Costs & Latency
 
-- **Turn ceiling:** maximum **5 tool turns** per meeting-brief request, with no more than **1 targeted retrieval retry** after reconciliation.
+- **Turn ceiling:** maximum **5 tool turns** per synchronization run.
+- **Retry budget:** maximum **1 targeted retry** when required evidence cannot be retrieved.
 - **Escalation trigger:** stop and return control to the PM when:
-  - a material conflict remains after the targeted retry;
-  - the same source system fails twice;
-  - source freshness cannot be established;
-  - an authoritative source needed for a claim is unavailable;
-  - verification cannot establish the status of a surfaced item.
-- **Latency and cost target:** **p95 ≤ 8 seconds** end-to-end and **≤ $0.12 per brief** on the normal path.
+  - the decision is not Approved;
+  - decision scope is unclear;
+  - authoritative sources materially conflict;
+  - an artifact changes after the PM reviewed the proposed edit;
+  - a write fails;
+  - post-write verification fails.
 
-If the loop budget is exhausted, Juno returns the verified portion of the brief plus:
+A normal run is:
 
-> **NEEDS CLARIFICATION — Juno could not verify this item within the retrieval budget.**
+> **Verify decision → find and inspect artifacts → classify and draft → PM review → write approved edits → verify**
+
+Parallel artifact reads may be grouped into a single turn where supported.
+
+- **Initial target:** p95 **≤ 8 seconds** for the pre-review analysis and **≤ $0.12 per sync run** on the normal path.
 
 ## 04 Memory · Data Requirements
 
-- **What persists, at what scope:**
-  - **turn:** transient reasoning and tool outputs;
-  - **session:** selected stakeholder, retrieved evidence, selected follow-ups, and selected talking points;
-  - **user:** preferred brief length, preferred Watch / Highlight / Coming Next format, recurring stakeholder presets;
+- **What persists:**
+  - **turn:** retrieved evidence and intermediate comparisons;
+  - **session:** decision ID, artifact impact map, proposed edits, and PM approval/rejection state;
+  - **user:** lightweight review preferences such as sort order or collapsed sections;
   - **team:** nothing in V1.
 
 - **Expiry:**
-  - session state: **30 minutes of inactivity**;
-  - user presentation preferences: **90 days**;
-  - explicit relevance feedback: **30 days**;
-  - dynamic facts such as roadmap status, ADO status, access, approvals, launch dates, and readiness conclusions: **do not persist** as factual memory.
+  - active sync session: **24 hours** or until completed;
+  - user preferences: **90 days**;
+  - dynamic product facts and artifact contents: **do not persist as trusted memory**.
 
 - **Write rules:**
-  - the PM may write durable preferences through explicit action;
-  - the model may propose a preference but may not save it autonomously;
-  - current source-system evidence outranks model memory;
-  - when the PM corrects a presentation or relevance preference, the PM's explicit correction outranks the model;
-  - a PM correction may not overwrite factual product truth from authoritative sources.
+  - Juno may preserve review state;
+  - PM approval or rejection outranks the model;
+  - current source-system content always outranks stored memory;
+  - decision status, artifact versions, and product behavior must be re-fetched before acting.
+
+> **Principle: remember the review state; re-fetch the product truth.**
 
 ## 05 Permissions · AI Risks & Mitigations
 
 | **Side-effect class** | **Tier** |
-| --------------------- | -------- |
-| read                  | **auto** |
-| draft                 | **auto** |
-| write                 | **blocked V1** |
-| send                  | **blocked V1** |
+|---|---|
+| read | **auto** |
+| draft | **auto** |
+| write | **confirm** |
+| send | **blocked V1** |
 
 **Justification:**
 
-- **Read = auto:** searching and reading approved internal sources does not mutate shared state. A bad retrieval wastes time but is recoverable.
-- **Draft = auto:** ranking evidence and drafting a private meeting brief affects only the initiating PM and can be edited, ignored, or discarded.
-- **Write = blocked V1:** changing ADO, SharePoint, roadmap status, or permissions would change shared organizational state and could cause colleagues to act on incorrect information. It is unnecessary to test Juno's core value.
-- **Send = blocked V1:** Teams posts and email leave the PM's private workspace and can be mistaken for official communication. The blast radius is larger and harder to reverse.
+- **Read = auto:** searching approved product sources changes nothing and is recoverable.
+- **Draft = auto:** impact classifications and proposed edits remain private and reviewable.
+- **Write = confirm:** changing a shared artifact can affect what teammates rely on, so the PM must approve the exact proposed edit first.
+- **Send = blocked:** stakeholder communication is outside the Decision Sync workflow and introduces unnecessary blast radius.
+
+Juno may never treat general permission to "sync the decision" as approval for an unspecified edit.
 
 ## 06 Verification · AI Testing & Measurement
 
-- **The check before output ships:** every brief passes the **Juno Brief Gate**.
+Every synchronization passes the **Juno Sync Gate**.
 
 The gate checks:
 
-1. **Citation coverage** — every factual claim has at least one source.
-   - **Bar:** 100%.
-2. **Status accuracy** — roadmap and delivery claims are labeled as **Completed, Committed, In Progress, Planned — Not Yet Committed, Discovery / Exploratory, Stakeholder Expectation,** or **Unverified**.
-   - **Bar:** 100% labeled; zero status-inflation errors in the golden set.
-3. **Conflict handling** — material disagreement between sources is detected and preserved.
-   - **Bar:** ≥90% recall on the future golden set; every detected material conflict is surfaced.
-4. **Freshness** — current-state claims meet the source freshness rule or are explicitly labeled stale/unverified.
-   - **Bar:** 100%.
-5. **Stakeholder relevance** — every surfaced item explains why it matters to the selected stakeholder.
-   - **Bar:** 100% structural coverage; target ≥80% relevance in PM testing.
-6. **Sensitive conclusions** — Juno does not independently declare clinical sufficiency, governance approval, security approval, deployment safety, or adequate model performance.
-   - **Bar:** zero unsupported sensitive conclusions.
+1. **Decision status** — only an **Approved** decision may be synchronized.
+2. **Decision fidelity** — the proposed edit stays inside the approved decision's scope.
+3. **Artifact classification** — every artifact is labeled **Update, Review, No Change,** or **Historical — Preserve**.
+4. **Source authority** — the proposed change is based on the correct source of truth.
+5. **PM approval** — every shared-artifact write matches an exact edit approved by the PM.
+6. **Freshness** — the artifact has not changed since the PM reviewed it.
+7. **Post-write verification** — Juno re-reads every changed artifact and confirms that only the approved edit was applied.
 
 - **Failure behaviour:**
-  - do not silently repair or drop material uncertainty;
-  - label unsupported claims **UNVERIFIED**;
-  - label unresolved conflicts **NEEDS CLARIFICATION** and show the conflicting evidence;
-  - do not present stale evidence as current;
-  - block unsupported clinical, governance, or security conclusions and report documented status only;
-  - if fewer than **2 verified items** survive the gate, return:
+  - decision is not Approved → **NOT ELIGIBLE FOR SYNC**
+  - evidence or scope is ambiguous → **NEEDS CLARIFICATION**
+  - artifact changed after review → **STALE REVIEW**
+  - write or verification fails → **SYNC FAILED**
+  - successful write and verification → **UPDATED & VERIFIED**
 
-> **INSUFFICIENT CURRENT EVIDENCE TO PREPARE A RELIABLE BRIEF**
-
-## Eval plan
-
-*Stub for Module 5.* Build the human evaluation rubric in `05-evals/human-rubric.md` and define the pass bar there.
-
-Initial scenarios to include:
-
-- Model Integration Framework described as "self-service" despite manual steps remaining;
-- broader AI Summary access expected by stakeholders but not committed;
-- full workspace customization assumed at launch but not in current scope;
-- a valid accomplishment that may be highlighted without inventing impact;
-- a valid upcoming item that must retain a planned/not-committed label;
-- a governance or monitoring question where Juno must return **NEEDS CLARIFICATION** rather than infer approval.
-
-## Out of scope
-
-The following are deliberately outside V1:
-
-- writing to ADO or SharePoint;
-- posting to Teams;
-- sending email;
-- changing permissions or access;
-- changing roadmap commitments;
-- approving governance, security, clinical readiness, or model performance;
-- autonomous escalation;
-- autonomous stakeholder outreach;
-- retrieving patient-level PHI or patient-specific clinical data;
-- any capability not listed in the V1 verb list.
-
-These are product decisions, not accidental omissions.
+Juno must never report **UPDATED & VERIFIED** based only on a successful write tool call.
