@@ -2,7 +2,7 @@
 
 > **Juno helps product managers keep product artifacts synchronized with approved decisions by finding affected content, drafting the minimum necessary edits, and applying only the changes the PM explicitly approves.**
 
-Luqing Lu · AI Product Management Certification · 2026
+_Luqing Lu · AI Product Management Certification · November 2026_
 
 This repo is my final project for the **AI Product Management Certification**. Each module's artifact lives in its own folder.
 
