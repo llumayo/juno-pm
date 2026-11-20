@@ -1,13 +1,14 @@
-# Juno PM
+# Juno · Decision Sync Agent
 
-> Juno helps internal product managers catch material commitment and readiness drift across scattered product signals before it becomes a stakeholder surprise.
+> **Juno helps product managers keep product artifacts synchronized with approved decisions by finding affected content, drafting the minimum necessary edits, and applying only the changes the PM explicitly approves.**
 
-Luqing Lu · AI Product Management (Duration: Nov13_26 - Nov19_26 | Instructor: Nnanna Enyi) · November 2026
+Luqing Lu · AI Product Management Certification · 2026
 
 This repo is my final project for the **AI Product Management Certification**. Each module's artifact lives in its own folder.
 
-**How to use this template:** click **Use this template → Create a new repository**, name it `juno-pm`, and commit one module's artifact per session. In Module 6, the **Final Project Deliverables Builder** reads these files and turns them into your final presentation.
+The project uses **Beacon**, a fictional internal clinical AI platform, as the product context for demonstrating Juno's Decision Sync workflow.
 
+**How to use this template:** click **Use this template → Create a new repository**, name it `juno-pm`, and commit one module's artifact per session. In Module 6, the **Final Project Deliverables Builder** reads these files and turns them into the final presentation.
 ---
 
 ## Module artifacts
